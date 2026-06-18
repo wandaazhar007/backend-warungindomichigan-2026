@@ -1,0 +1,203 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  icon        String?
+  description String?
+  isActive    Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+}
+
+model Product {
+  id           String         @id @default(cuid())
+  name         String
+  slug         String         @unique
+  description  String?
+  price        Decimal        @db.Decimal(10, 2)
+  comparePrice Decimal?       @db.Decimal(10, 2)
+  unit         String         @default("pcs")
+  stock        Int            @default(0)
+  minStock     Int            @default(5)
+  sku          String?        @unique
+  weightGrams  Float          @default(300)
+  images       ProductImage[]
+  categoryId   String
+  category     Category       @relation(fields: [categoryId], references: [id])
+  isActive     Boolean        @default(true)
+  isFeatured   Boolean        @default(false)
+  tags         String[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  orderItems   OrderItem[]
+  cartItems    CartItem[]
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  altText   String?
+  isPrimary Boolean @default(false)
+  sortOrder Int     @default(0)
+}
+
+model Customer {
+  id          String    @id @default(cuid())
+  firebaseUid String?   @unique
+  email       String    @unique
+  phone       String?
+  firstName   String?
+  lastName    String?
+  stripeId    String?   @unique
+  isGuest     Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  addresses   Address[]
+  orders      Order[]
+  carts       Cart[]
+}
+
+model Address {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  firstName  String
+  lastName   String
+  street1    String
+  street2    String?
+  city       String
+  state      String
+  zip        String
+  country    String   @default("US")
+  phone      String?
+  isDefault  Boolean  @default(false)
+}
+
+model Cart {
+  id         String     @id @default(cuid())
+  customerId String?
+  customer   Customer?  @relation(fields: [customerId], references: [id])
+  sessionId  String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  expiresAt  DateTime?
+  items      CartItem[]
+}
+
+model CartItem {
+  id        String  @id @default(cuid())
+  cartId    String
+  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Decimal @db.Decimal(10, 2)
+}
+
+model Order {
+  id                    String               @id @default(cuid())
+  orderNumber           String               @unique
+  customerId            String?
+  customer              Customer?            @relation(fields: [customerId], references: [id])
+  isGuestOrder          Boolean              @default(false)
+  email                 String
+  phone                 String
+  status                OrderStatus          @default(PENDING)
+  paymentStatus         PaymentStatus        @default(UNPAID)
+  fulfillmentStatus     FulfillStatus        @default(UNFULFILLED)
+  subtotal              Decimal              @db.Decimal(10, 2)
+  shippingCost          Decimal              @db.Decimal(10, 2) @default(0)
+  tax                   Decimal              @db.Decimal(10, 2) @default(0)
+  discount              Decimal              @db.Decimal(10, 2) @default(0)
+  total                 Decimal              @db.Decimal(10, 2)
+  shipFirstName         String
+  shipLastName          String
+  shipStreet1           String
+  shipStreet2           String?
+  shipCity              String
+  shipState             String
+  shipZip               String
+  shipCountry           String               @default("US")
+  shipPhone             String?
+  shippingCarrier       String?
+  shippingService       String?
+  shippingRate          Json?
+  selectedBoxSize       String?
+  trackingNumber        String?
+  trackingUrl           String?
+  shippoOrderId         String?
+  shippingLabelUrl      String?
+  shippedAt             DateTime?
+  estimatedDelivery     DateTime?
+  stripePaymentIntentId String?              @unique
+  stripeChargeId        String?
+  paidAt                DateTime?
+  customerNote          String?
+  adminNote             String?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  items                 OrderItem[]
+  statusHistory         OrderStatusHistory[]
+}
+
+model OrderItem {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id])
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id])
+  productName String
+  productSku  String?
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  quantity    Int
+  subtotal    Decimal  @db.Decimal(10, 2)
+  weightGrams Float    @default(300)
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(cuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id])
+  status    OrderStatus
+  note      String?
+  createdBy String?
+  createdAt DateTime    @default(now())
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  PARTIALLY_REFUNDED
+  REFUNDED
+  FAILED
+}
+
+enum FulfillStatus {
+  UNFULFILLED
+  PARTIALLY_FULFILLED
+  FULFILLED
+}
