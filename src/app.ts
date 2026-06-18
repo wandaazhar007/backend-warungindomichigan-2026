@@ -14,6 +14,7 @@ const allowedOrigins = [
   'http://localhost:5173',
   'https://warungindomichigan.com',
   'https://admin.warungindomichigan.com',
+  'https://warungindomichigan.vercel.app',
 ];
 
 app.use(
