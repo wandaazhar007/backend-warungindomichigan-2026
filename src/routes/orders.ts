@@ -5,6 +5,7 @@ import { stripe } from '../config/stripe';
 import { selectBox } from '../config/boxSizes';
 import { verifyFirebaseToken, AuthRequest } from '../middleware/auth';
 import { admin } from '../config/firebase';
+import { sendOrderConfirmationEmail } from '../lib/email';
 
 const router = Router();
 
@@ -240,6 +241,138 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   } catch (err) {
     console.error('POST /orders error:', err);
     res.status(500).json({ error: 'Failed to create order' });
+  }
+});
+
+// POST /api/orders/:orderNumber/confirm-payment
+// Called from frontend after stripe.confirmPayment() returns succeeded.
+// Verifies payment directly with Stripe, then confirms the order and sends email.
+// Idempotent — safe to call even if webhook also fires later.
+router.post('/:orderNumber/confirm-payment', async (req: Request, res: Response): Promise<void> => {
+  const { orderNumber } = req.params;
+  const { paymentIntentId } = req.body as { paymentIntentId: string };
+
+  if (!paymentIntentId) {
+    res.status(400).json({ error: 'paymentIntentId is required' });
+    return;
+  }
+
+  try {
+    // Verify with Stripe directly — never trust client-sent status
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    if (paymentIntent.status !== 'succeeded') {
+      res.status(400).json({ error: `Payment not succeeded (status: ${paymentIntent.status})` });
+      return;
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { orderNumber },
+      include: {
+        items: {
+          include: { product: { select: { id: true, name: true } } },
+        },
+      },
+    });
+
+    if (!order) {
+      res.status(404).json({ error: 'Order not found' });
+      return;
+    }
+
+    // Security: make sure this PaymentIntent actually belongs to this order
+    if (order.stripePaymentIntentId !== paymentIntentId) {
+      res.status(403).json({ error: 'PaymentIntent does not match this order' });
+      return;
+    }
+
+    // Idempotency — if already confirmed, just return current order
+    if (order.paymentStatus !== 'PAID') {
+      await prisma.$transaction(async (tx) => {
+        await tx.order.update({
+          where: { id: order.id },
+          data: {
+            paymentStatus: 'PAID',
+            status: 'CONFIRMED',
+            stripeChargeId: (paymentIntent.latest_charge as string) ?? null,
+            paidAt: new Date(),
+          },
+        });
+
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: order.id,
+            status: 'CONFIRMED',
+            note: `Payment confirmed via Stripe (${paymentIntentId})`,
+            createdBy: 'system',
+          },
+        });
+
+        // Decrement stock
+        for (const item of order.items) {
+          if (!item.productId) continue;
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { decrement: item.quantity } },
+          });
+        }
+      });
+
+      // Send confirmation email (non-critical — don't fail the response)
+      try {
+        await sendOrderConfirmationEmail({
+          orderNumber: order.orderNumber,
+          firstName: order.shipFirstName,
+          email: order.email,
+          items: order.items.map((i) => ({
+            productName: i.productName,
+            quantity: i.quantity,
+            unitPrice: i.unitPrice.toString(),
+            subtotal: i.subtotal.toString(),
+          })),
+          subtotal:     order.subtotal.toString(),
+          shippingCost: order.shippingCost.toString(),
+          tax:          order.tax.toString(),
+          total:        order.total.toString(),
+          shipFirstName: order.shipFirstName,
+          shipLastName:  order.shipLastName,
+          shipStreet1:   order.shipStreet1,
+          shipStreet2:   order.shipStreet2,
+          shipCity:      order.shipCity,
+          shipState:     order.shipState,
+          shipZip:       order.shipZip,
+          shippingCarrier: order.shippingCarrier,
+          shippingService: order.shippingService,
+        });
+        console.log(`Confirmation email sent for order ${order.orderNumber} to ${order.email}`);
+      } catch (emailErr) {
+        console.error(`Failed to send confirmation email for ${order.orderNumber}:`, emailErr);
+      }
+
+      console.log(`Order ${order.orderNumber} confirmed via client-side (PI: ${paymentIntentId})`);
+    }
+
+    // Return full order detail for the success page
+    const updatedOrder = await prisma.order.findUnique({
+      where: { orderNumber },
+      include: {
+        items: {
+          include: {
+            product: {
+              select: {
+                slug: true,
+                images: { where: { isPrimary: true }, take: 1 },
+              },
+            },
+          },
+        },
+        statusHistory: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+
+    res.json(updatedOrder);
+  } catch (err) {
+    console.error(`POST /orders/${orderNumber}/confirm-payment error:`, err);
+    res.status(500).json({ error: 'Failed to confirm payment' });
   }
 });
 
