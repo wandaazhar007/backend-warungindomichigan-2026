@@ -16,6 +16,7 @@ const allowedOrigins = [
   'https://admin.warungindomichigan.com',
   'https://warungindomichigan.vercel.app',
   'https://admin-warungindomichigan-2026.vercel.app',
+  'https://warungindomi.vercel.app',
 ];
 
 app.use(
