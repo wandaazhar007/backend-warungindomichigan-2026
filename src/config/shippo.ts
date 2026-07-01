@@ -57,7 +57,7 @@ export async function getShippingRates(
   parcel: ShippoParcel
 ): Promise<ShippoRate[]> {
   const addressFrom: ShippoAddress = {
-    name: process.env.WIM_ORIGIN_NAME ?? 'Warung Indo Michigan',
+    name: process.env.WIM_ORIGIN_NAME ?? 'Warung IndoMi',
     street1: process.env.WIM_ORIGIN_STREET1 ?? '',
     city: process.env.WIM_ORIGIN_CITY ?? 'Madison Heights',
     state: process.env.WIM_ORIGIN_STATE ?? 'MI',

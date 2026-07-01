@@ -62,7 +62,7 @@ function buildConfirmationEmailHtml(order: OrderEmailData): string {
         <!-- Header -->
         <tr>
           <td style="background:#E86363;padding:32px;text-align:center;">
-            <h1 style="margin:0;color:#FFFFFF;font-size:24px;font-weight:700;">Warung Indo Michigan</h1>
+            <h1 style="margin:0;color:#FFFFFF;font-size:24px;font-weight:700;">Warung IndoMi</h1>
             <p style="margin:8px 0 0;color:#FFE8E8;font-size:14px;">Taste of Home, Wherever You Are</p>
           </td>
         </tr>
@@ -71,7 +71,7 @@ function buildConfirmationEmailHtml(order: OrderEmailData): string {
         <tr>
           <td style="padding:32px;">
             <p style="margin:0 0 8px;font-size:16px;">Halo ${order.firstName},</p>
-            <p style="margin:0 0 24px;color:#71717A;">Terima kasih sudah berbelanja di Warung Indo Michigan! Pesananmu telah kami terima dan sedang kami proses.</p>
+            <p style="margin:0 0 24px;color:#71717A;">Terima kasih sudah berbelanja di Warung IndoMi! Pesananmu telah kami terima dan sedang kami proses.</p>
 
             <!-- Order number badge -->
             <div style="background:#FFF5F5;border:1px solid #FFCCCC;border-radius:8px;padding:16px;margin-bottom:24px;text-align:center;">
@@ -142,8 +142,8 @@ function buildConfirmationEmailHtml(order: OrderEmailData): string {
         <tr>
           <td style="background:#F4F4F5;padding:24px;text-align:center;">
             <p style="margin:0;font-size:13px;color:#71717A;">Salam hangat,</p>
-            <p style="margin:4px 0 0;font-size:14px;font-weight:600;color:#3F3F46;">Tim Warung Indo Michigan</p>
-            <p style="margin:16px 0 0;font-size:12px;color:#A1A1AA;">© 2026 Warung Indo Michigan. All rights reserved.<br>Built with ❤️ in Michigan, USA</p>
+            <p style="margin:4px 0 0;font-size:14px;font-weight:600;color:#3F3F46;">Tim Warung IndoMi</p>
+            <p style="margin:16px 0 0;font-size:12px;color:#A1A1AA;">© 2026 Warung IndoMi. All rights reserved.<br>Built with ❤️ in Michigan, USA</p>
           </td>
         </tr>
 
@@ -164,7 +164,7 @@ function buildShippedEmailHtml(order: OrderEmailData): string {
       <table width="600" cellpadding="0" cellspacing="0" style="background:#FFFFFF;border-radius:12px;overflow:hidden;border:1px solid #E4E4E7;">
         <tr>
           <td style="background:#E86363;padding:32px;text-align:center;">
-            <h1 style="margin:0;color:#FFFFFF;font-size:24px;font-weight:700;">Warung Indo Michigan</h1>
+            <h1 style="margin:0;color:#FFFFFF;font-size:24px;font-weight:700;">Warung IndoMi</h1>
           </td>
         </tr>
         <tr>
@@ -190,7 +190,7 @@ function buildShippedEmailHtml(order: OrderEmailData): string {
         <tr>
           <td style="background:#F4F4F5;padding:24px;text-align:center;">
             <p style="margin:0;font-size:13px;color:#71717A;">Salam hangat,</p>
-            <p style="margin:4px 0 0;font-size:14px;font-weight:600;">Tim Warung Indo Michigan</p>
+            <p style="margin:4px 0 0;font-size:14px;font-weight:600;">Tim Warung IndoMi</p>
           </td>
         </tr>
       </table>
@@ -204,7 +204,7 @@ export async function sendOrderConfirmationEmail(order: OrderEmailData): Promise
   await resend.emails.send({
     from: process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev',
     to: order.email,
-    subject: `Pesanan #${order.orderNumber} Berhasil Diterima — Warung Indo Michigan`,
+    subject: `Pesanan #${order.orderNumber} Berhasil Diterima — Warung IndoMi`,
     html: buildConfirmationEmailHtml(order),
   });
 }
@@ -229,7 +229,7 @@ function buildPaymentFailedEmailHtml(orderNumber: string, firstName: string): st
 
         <tr>
           <td style="background:#E86363;padding:32px;text-align:center;">
-            <h1 style="margin:0;color:#FFFFFF;font-size:24px;font-weight:700;">Warung Indo Michigan</h1>
+            <h1 style="margin:0;color:#FFFFFF;font-size:24px;font-weight:700;">Warung IndoMi</h1>
             <p style="margin:8px 0 0;color:#FFE8E8;font-size:14px;">Taste of Home, Wherever You Are</p>
           </td>
         </tr>
@@ -264,8 +264,8 @@ function buildPaymentFailedEmailHtml(orderNumber: string, firstName: string): st
         <tr>
           <td style="background:#F4F4F5;padding:24px;text-align:center;">
             <p style="margin:0;font-size:13px;color:#71717A;">Salam hangat,</p>
-            <p style="margin:4px 0 0;font-size:14px;font-weight:600;color:#3F3F46;">Tim Warung Indo Michigan</p>
-            <p style="margin:16px 0 0;font-size:12px;color:#A1A1AA;">© 2026 Warung Indo Michigan. All rights reserved.</p>
+            <p style="margin:4px 0 0;font-size:14px;font-weight:600;color:#3F3F46;">Tim Warung IndoMi</p>
+            <p style="margin:16px 0 0;font-size:12px;color:#A1A1AA;">© 2026 Warung IndoMi. All rights reserved.</p>
           </td>
         </tr>
 
