@@ -46,14 +46,17 @@ async function generateOrderNumber(): Promise<string> {
   return `WIM-${year}-${String(count + 1).padStart(4, '0')}`;
 }
 
-// Resolve Firebase UID from optional auth header — does not block if absent
-async function resolveFirebaseUid(req: Request): Promise<string | null> {
+// Resolve Firebase user from optional auth header — does not block if absent.
+// Returns null for guests (no/invalid token); the caller keeps the guest path untouched.
+async function resolveFirebaseUser(
+  req: Request
+): Promise<{ uid: string; emailVerified: boolean } | null> {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) return null;
   try {
     const token = authHeader.split('Bearer ')[1];
     const decoded = await admin.auth().verifyIdToken(token);
-    return decoded.uid;
+    return { uid: decoded.uid, emailVerified: decoded.email_verified === true };
   } catch {
     return null;
   }
@@ -77,6 +80,14 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       !shipping?.rateObjectId || shipping.amount === undefined
     ) {
       res.status(400).json({ error: 'Missing required fields' });
+      return;
+    }
+
+    // Resolve the requester. Guests send no token -> null -> unaffected.
+    // A logged-in account must have a verified email before ordering as itself.
+    const firebaseUser = await resolveFirebaseUser(req);
+    if (firebaseUser && !firebaseUser.emailVerified) {
+      res.status(403).json({ error: 'Email not verified' });
       return;
     }
 
@@ -119,7 +130,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     const box = selectBox(totalWeightGrams);
 
     // Resolve customer (logged-in or guest)
-    const firebaseUid = await resolveFirebaseUid(req);
+    const firebaseUid = firebaseUser?.uid ?? null;
     let customerId: string | null = null;
     let isGuestOrder = true;
 
