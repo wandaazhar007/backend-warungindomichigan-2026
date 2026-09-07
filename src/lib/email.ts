@@ -2,6 +2,32 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
+
+/**
+ * Send via Resend and surface failures. `resend.emails.send()` resolves with
+ * `{ data, error }` — it does NOT throw on an API error (missing key, unverified
+ * domain, "onboarding@resend.dev" can only mail the account owner, etc.), so
+ * without this the caller logs "email sent" while nothing was delivered.
+ */
+async function sendEmail(opts: { to: string; subject: string; html: string }): Promise<void> {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY is not set — cannot send email');
+  }
+  const { data, error } = await resend.emails.send({
+    from: FROM_EMAIL,
+    to: opts.to,
+    subject: opts.subject,
+    html: opts.html,
+  });
+  if (error) {
+    throw new Error(
+      `Resend rejected email to ${opts.to} (from ${FROM_EMAIL}): ${error.name} — ${error.message}`
+    );
+  }
+  console.log(`Email sent to ${opts.to} (Resend id: ${data?.id})`);
+}
+
 interface OrderItem {
   productName: string;
   quantity: number;
@@ -201,8 +227,7 @@ function buildShippedEmailHtml(order: OrderEmailData): string {
 }
 
 export async function sendOrderConfirmationEmail(order: OrderEmailData): Promise<void> {
-  await resend.emails.send({
-    from: process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev',
+  await sendEmail({
     to: order.email,
     subject: `Pesanan #${order.orderNumber} Berhasil Diterima — Warung IndoMi`,
     html: buildConfirmationEmailHtml(order),
@@ -210,8 +235,7 @@ export async function sendOrderConfirmationEmail(order: OrderEmailData): Promise
 }
 
 export async function sendOrderShippedEmail(order: OrderEmailData): Promise<void> {
-  await resend.emails.send({
-    from: process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev',
+  await sendEmail({
     to: order.email,
     subject: `Pesanan #${order.orderNumber} Sudah Dikirim! 🚚`,
     html: buildShippedEmailHtml(order),
@@ -281,8 +305,7 @@ export async function sendPaymentFailedEmail(
   orderNumber: string,
   firstName: string,
 ): Promise<void> {
-  await resend.emails.send({
-    from: process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev',
+  await sendEmail({
     to: email,
     subject: `Pembayaran Gagal — Pesanan #${orderNumber}`,
     html: buildPaymentFailedEmailHtml(orderNumber, firstName),
