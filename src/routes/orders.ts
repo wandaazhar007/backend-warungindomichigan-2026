@@ -144,17 +144,23 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       customerId = customer.id;
       isGuestOrder = false;
     } else {
-      // Guest: find existing by email or create new guest record
-      const existingGuest = await prisma.customer.findUnique({ where: { email } });
-      if (existingGuest) {
-        customerId = existingGuest.id;
-        isGuestOrder = existingGuest.isGuest;
-      } else {
+      // Guest checkout: no valid token. Always a guest order — the buyer did not
+      // authenticate and the email is unverified free text.
+      isGuestOrder = true;
+      const existing = await prisma.customer.findUnique({ where: { email } });
+      if (existing?.isGuest) {
+        // Reuse an existing guest record for the same email.
+        customerId = existing.id;
+      } else if (!existing) {
         const guestCustomer = await prisma.customer.create({
           data: { email, phone, firstName, lastName, isGuest: true },
         });
         customerId = guestCustomer.id;
-        isGuestOrder = true;
+      } else {
+        // Email belongs to a registered account. Do NOT attach this
+        // unauthenticated order to it — that would let anyone inject orders into
+        // a real user's history. Leave it unlinked (still reachable by orderNumber).
+        customerId = null;
       }
     }
 

@@ -33,6 +33,9 @@ const mockProducts = [
 ];
 
 describe('POST /api/orders', () => {
+  // Spy shared with tests that need to inspect the persisted order payload.
+  let orderCreateSpy: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.mocked(prisma.product.findMany).mockResolvedValue(mockProducts as never);
     vi.mocked(prisma.order.count).mockResolvedValue(0);
@@ -40,17 +43,16 @@ describe('POST /api/orders', () => {
       id:            'pi_test123',
       client_secret: 'pi_test123_secret_xyz',
     } as never);
+    orderCreateSpy = vi.fn().mockResolvedValue({
+      id:          'order_1',
+      orderNumber: 'WIM-2026-0001',
+      email:       'budi@example.com',
+      items:       [],
+    });
     // Mock the transaction to return a created order
     vi.mocked(prisma.$transaction).mockImplementation(async (fn: (tx: unknown) => unknown) => {
       const mockTx = {
-        order: {
-          create: vi.fn().mockResolvedValue({
-            id:          'order_1',
-            orderNumber: 'WIM-2026-0001',
-            email:       'budi@example.com',
-            items:       [],
-          }),
-        },
+        order: { create: orderCreateSpy },
         orderStatusHistory: { create: vi.fn().mockResolvedValue({}) },
         product:            { update: vi.fn().mockResolvedValue({}) },
         customer: {
@@ -145,6 +147,53 @@ describe('POST /api/orders', () => {
       expect.objectContaining({
         amount:   2298,
         currency: 'usd',
+      })
+    );
+  });
+
+  it('guest checkout with a new email creates a guest customer and flags isGuestOrder', async () => {
+    vi.mocked(prisma.customer.findUnique).mockResolvedValue(null);
+
+    await request(app).post('/api/orders').send(VALID_ORDER_BODY);
+
+    expect(prisma.customer.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ isGuest: true }) })
+    );
+    expect(orderCreateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ isGuestOrder: true, customerId: 'cust_guest' }),
+      })
+    );
+  });
+
+  it('guest checkout with a registered account email does NOT attach the order to that account', async () => {
+    // Email belongs to a real (non-guest) account — an unauthenticated buyer must
+    // not be able to inject orders into that account's history.
+    vi.mocked(prisma.customer.findUnique).mockResolvedValue({
+      id: 'cust_registered', email: VALID_ORDER_BODY.email, isGuest: false,
+    } as never);
+
+    await request(app).post('/api/orders').send(VALID_ORDER_BODY);
+
+    expect(prisma.customer.create).not.toHaveBeenCalled();
+    expect(orderCreateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ isGuestOrder: true, customerId: null }),
+      })
+    );
+  });
+
+  it('guest checkout reuses an existing guest customer for the same email', async () => {
+    vi.mocked(prisma.customer.findUnique).mockResolvedValue({
+      id: 'cust_existing_guest', email: VALID_ORDER_BODY.email, isGuest: true,
+    } as never);
+
+    await request(app).post('/api/orders').send(VALID_ORDER_BODY);
+
+    expect(prisma.customer.create).not.toHaveBeenCalled();
+    expect(orderCreateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ isGuestOrder: true, customerId: 'cust_existing_guest' }),
       })
     );
   });
